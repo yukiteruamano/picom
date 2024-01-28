@@ -207,6 +207,13 @@ fail:
 	return false;
 }
 
+DBusConnection *cdbus_get_conn(void *dbus_data, bool system) {
+	if (system) {
+		return ((struct cdbus_data *)dbus_data)->system_bus;
+	}
+	return ((struct cdbus_data *)dbus_data)->session_bus;
+}
+
 /**
  * Destroy D-Bus connection.
  */

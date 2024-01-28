@@ -33,6 +33,9 @@ bool cdbus_init(session_t *ps, const char *uniq_name);
  */
 void cdbus_destroy(session_t *ps);
 
+/// Get the D-Bus connection.
+DBusConnection *cdbus_get_conn(void *, bool system);
+
 /// Generate dbus win_added signal
 void cdbus_ev_win_added(session_t *ps, struct win *w);
 

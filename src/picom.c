@@ -60,6 +60,8 @@
 #include "x.h"
 #ifdef CONFIG_DBUS
 #include "dbus.h"
+#else
+typedef struct DBusConnection DBusConnection;
 #endif
 #include "atom.h"
 #include "event.h"
@@ -1430,6 +1432,17 @@ xcb_window_t session_get_target_window(session_t *ps) {
 	}
 	return ps->overlay != XCB_NONE ? ps->overlay : ps->c.screen_info->root;
 }
+
+#ifdef CONFIG_DBUS
+static inline DBusConnection *session_get_dbus_connection(session_t *ps, bool system) {
+	return cdbus_get_conn(ps->dbus_data, system);
+}
+#else
+static inline DBusConnection *
+session_get_dbus_connection(session_t *ps attr_unused, bool system attr_unused) {
+	return NULL;
+}
+#endif
 
 uint8_t session_redirection_mode(session_t *ps) {
 	if (ps->o.debug_mode) {
