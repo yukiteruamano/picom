@@ -1,5 +1,9 @@
 # Unreleased
 
+## Dependency changes
+
+* picom now optionally depends on `rtkit` to give itself realtime scheduling priority.
+
 # v11.1 (2024-Jan-28)
 
 ## Bug fixes
