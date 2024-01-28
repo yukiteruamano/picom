@@ -68,6 +68,7 @@ typedef struct DBusConnection DBusConnection;
 #include "file_watch.h"
 #include "list.h"
 #include "options.h"
+#include "rtkit.h"
 #include "statistics.h"
 #include "uthash_extra.h"
 #include "vblank.h"
@@ -2565,27 +2566,32 @@ err:
 ///
 /// This requires the user to set up permissions for the real-time scheduling. e.g. by
 /// setting `ulimit -r`, or giving us the CAP_SYS_NICE capability.
-void set_rr_scheduling(void) {
+void set_rr_scheduling(session_t *ps) {
 	int priority = sched_get_priority_min(SCHED_RR);
+	DBusConnection *bus = session_get_dbus_connection(ps, true);
 
+	if (bus && rtkit_make_realtime(bus, 0, priority)) {
+		log_info("Set realtime priority to %d with rtkit.", priority);
+		return;
+	}
+
+	// Fallback to use sched_setscheduler
 	int ret;
 	struct sched_param param;
 
 	ret = sched_getparam(0, &param);
 	if (ret != 0) {
-		log_debug("Failed to get old scheduling priority");
+		log_info("Couldn't get old scheduling priority.");
 		return;
 	}
 
 	param.sched_priority = priority;
 	ret = sched_setscheduler(0, SCHED_RR, &param);
 	if (ret != 0) {
-		log_info("Failed to set real-time scheduling priority to %d. Consider "
-		         "giving picom the CAP_SYS_NICE capability",
-		         priority);
+		log_info("Couldn't set real-time scheduling priority to %d.", priority);
 		return;
 	}
-	log_info("Set real-time scheduling priority to %d", priority);
+	log_info("Set real-time scheduling priority to %d.", priority);
 }
 
 /**
@@ -2778,7 +2784,7 @@ static void session_destroy(session_t *ps) {
  * @param ps current session
  */
 static void session_run(session_t *ps) {
-	set_rr_scheduling();
+	set_rr_scheduling(ps);
 	// In benchmark mode, we want draw_timer handler to always be active
 	if (ps->o.benchmark) {
 		ev_timer_set(&ps->draw_timer, 0, 0);
