@@ -48,8 +48,14 @@
 /// When top half finished, we enter the render stage, where no server state should be
 /// queried. All rendering should be done with our internal knowledge of the server state.
 ///
+/// P.S. There is another reason to avoid sending any request to the server as much as
+/// possible. To make sure requests are sent, flushes are needed. And `xcb_flush`/`XFlush`
+/// functions will read more events from the server into their queues. This is
+/// undesirable, see the comments on `handle_queued_x_events` in picom.c for more details.
 
 // TODO(yshui) the things described above
+//             update: this is mostly done, maybe some of the functions here is still
+//             making unnecessary queries, we need to do some auditing to be sure.
 
 /**
  * Get a window's name from window ID.
