@@ -400,11 +400,11 @@ bool gl_blur_impl(double opacity, struct gl_blur_context *bctx, void *mask, coor
 	return ret;
 }
 
-bool gl_blur(backend_t *base, double opacity, void *ctx, void *mask, coord_t mask_dst,
+bool gl_blur(backend_t *base, double opacity, void *ctx, image_handle mask, coord_t mask_dst,
              const region_t *reg_blur, const region_t *reg_visible attr_unused) {
 	auto gd = (struct gl_data *)base;
 	auto bctx = (struct gl_blur_context *)ctx;
-	return gl_blur_impl(opacity, bctx, mask, mask_dst, reg_blur, reg_visible,
+	return gl_blur_impl(opacity, bctx, mask.p, mask_dst, reg_blur, reg_visible,
 	                    gd->back_texture,
 	                    (geometry_t){.width = gd->width, .height = gd->height},
 	                    gd->back_fbo, gd->default_mask_texture, gd->dithered_present);

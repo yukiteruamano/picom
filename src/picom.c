@@ -624,7 +624,7 @@ static void destroy_backend(session_t *ps) {
 		if (ps->backend_data) {
 			// Unmapped windows could still have shadow images, but not pixmap
 			// images
-			assert(!w->win_image || w->state != WSTATE_UNMAPPED);
+			assert(w->win_image.p == NULL || w->state != WSTATE_UNMAPPED);
 			if (win_check_flags_any(w, WIN_FLAGS_IMAGES_STALE) &&
 			    w->state == WSTATE_MAPPED) {
 				log_warn("Stale flags set for mapped window %#010x "
@@ -648,9 +648,9 @@ static void destroy_backend(session_t *ps) {
 		}
 	}
 
-	if (ps->backend_data && ps->root_image) {
+	if (ps->backend_data && ps->root_image.p != NULL) {
 		ps->backend_data->ops->release_image(ps->backend_data, ps->root_image);
-		ps->root_image = NULL;
+		ps->root_image = IMAGE_HANDLE_NONE;
 	}
 
 	if (ps->backend_data) {
@@ -1152,9 +1152,9 @@ void root_damaged(session_t *ps) {
 	}
 
 	if (ps->backend_data) {
-		if (ps->root_image) {
+		if (ps->root_image.p != NULL) {
 			ps->backend_data->ops->release_image(ps->backend_data, ps->root_image);
-			ps->root_image = NULL;
+			ps->root_image = IMAGE_HANDLE_NONE;
 		}
 		auto pixmap = x_get_root_back_pixmap(&ps->c, ps->atoms);
 		if (pixmap != XCB_NONE) {
@@ -1189,7 +1189,7 @@ void root_damaged(session_t *ps) {
 
 			ps->root_image = ps->backend_data->ops->bind_pixmap(
 			    ps->backend_data, pixmap, x_get_visual_info(&ps->c, visual), false);
-			if (ps->root_image) {
+			if (ps->root_image.p != NULL) {
 				ps->backend_data->ops->set_image_property(
 				    ps->backend_data, IMAGE_PROPERTY_EFFECTIVE_SIZE,
 				    ps->root_image, (int[]){ps->root_width, ps->root_height});

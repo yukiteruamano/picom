@@ -294,34 +294,34 @@ void add_damage_from_win(session_t *ps, const struct managed_win *w) {
 /// Release the images attached to this window
 static inline void win_release_pixmap(backend_t *base, struct managed_win *w) {
 	log_debug("Releasing pixmap of window %#010x (%s)", w->base.id, w->name);
-	assert(w->win_image);
-	if (w->win_image) {
+	assert(w->win_image.p != NULL);
+	if (w->win_image.p != NULL) {
 		base->ops->release_image(base, w->win_image);
-		w->win_image = NULL;
+		w->win_image = IMAGE_HANDLE_NONE;
 		// Bypassing win_set_flags, because `w` might have been destroyed
 		w->flags |= WIN_FLAGS_PIXMAP_NONE;
 	}
 }
 static inline void win_release_shadow(backend_t *base, struct managed_win *w) {
 	log_debug("Releasing shadow of window %#010x (%s)", w->base.id, w->name);
-	assert(w->shadow_image);
-	if (w->shadow_image) {
+	assert(w->shadow_image.p != NULL);
+	if (w->shadow_image.p != NULL) {
 		base->ops->release_image(base, w->shadow_image);
-		w->shadow_image = NULL;
+		w->shadow_image = IMAGE_HANDLE_NONE;
 		// Bypassing win_set_flags, because `w` might have been destroyed
 		w->flags |= WIN_FLAGS_SHADOW_NONE;
 	}
 }
 
 static inline void win_release_mask(backend_t *base, struct managed_win *w) {
-	if (w->mask_image) {
+	if (w->mask_image.p != NULL) {
 		base->ops->release_image(base, w->mask_image);
-		w->mask_image = NULL;
+		w->mask_image = IMAGE_HANDLE_NONE;
 	}
 }
 
 static inline bool win_bind_pixmap(struct backend_base *b, struct managed_win *w) {
-	assert(!w->win_image);
+	assert(w->win_image.p == NULL);
 	auto pixmap = x_new_id(b->c);
 	auto e = xcb_request_check(
 	    b->c->c, xcb_composite_name_window_pixmap_checked(b->c->c, w->base.id, pixmap));
@@ -334,7 +334,7 @@ static inline bool win_bind_pixmap(struct backend_base *b, struct managed_win *w
 	log_debug("New named pixmap for %#010x (%s) : %#010x", w->base.id, w->name, pixmap);
 	w->win_image =
 	    b->ops->bind_pixmap(b, pixmap, x_get_visual_info(b->c, w->a.visual), true);
-	if (!w->win_image) {
+	if (!w->win_image.p) {
 		log_error("Failed to bind pixmap");
 		win_set_flags(w, WIN_FLAGS_IMAGE_ERROR);
 		return false;
@@ -345,14 +345,14 @@ static inline bool win_bind_pixmap(struct backend_base *b, struct managed_win *w
 }
 
 bool win_bind_mask(struct backend_base *b, struct managed_win *w) {
-	assert(!w->mask_image);
+	assert(w->mask_image.p == NULL);
 	auto reg_bound_local = win_get_bounding_shape_global_by_val(w);
 	pixman_region32_translate(&reg_bound_local, -w->g.x, -w->g.y);
 	w->mask_image = b->ops->make_mask(
 	    b, (geometry_t){.width = w->widthb, .height = w->heightb}, &reg_bound_local);
 	pixman_region32_fini(&reg_bound_local);
 
-	if (!w->mask_image) {
+	if (w->mask_image.p == NULL) {
 		return false;
 	}
 	b->ops->set_image_property(b, IMAGE_PROPERTY_CORNER_RADIUS, w->mask_image,
@@ -362,20 +362,20 @@ bool win_bind_mask(struct backend_base *b, struct managed_win *w) {
 
 bool win_bind_shadow(struct backend_base *b, struct managed_win *w, struct color c,
                      struct backend_shadow_context *sctx) {
-	assert(!w->shadow_image);
+	assert(w->shadow_image.p == NULL);
 	assert(w->shadow);
 	if ((w->corner_radius == 0 && w->bounding_shaped == false) ||
 	    b->ops->shadow_from_mask == NULL) {
 		w->shadow_image = b->ops->render_shadow(b, w->widthb, w->heightb, sctx, c);
 	} else {
-		if (!w->mask_image) {
+		if (w->mask_image.p == NULL) {
 			// It's possible we already allocated a mask because of background
 			// blur
 			win_bind_mask(b, w);
 		}
 		w->shadow_image = b->ops->shadow_from_mask(b, w->mask_image, sctx, c);
 	}
-	if (!w->shadow_image) {
+	if (w->shadow_image.p == NULL) {
 		log_error("Failed to bind shadow image, shadow will be disabled "
 		          "for "
 		          "%#010x (%s)",
@@ -937,7 +937,7 @@ static void win_set_shadow(session_t *ps, struct managed_win *w, bool shadow_new
 		// asserting the existence of the shadow image.
 		if (w->shadow) {
 			// Mark the new extents as damaged if the shadow is added
-			assert(!w->shadow_image ||
+			assert(w->shadow_image.p == NULL ||
 			       win_check_flags_all(w, WIN_FLAGS_SHADOW_STALE) ||
 			       ps->o.legacy_backends);
 			pixman_region32_clear(&extents);
@@ -946,7 +946,7 @@ static void win_set_shadow(session_t *ps, struct managed_win *w, bool shadow_new
 		} else {
 			// Mark the old extents as damaged if the shadow is
 			// removed
-			assert(w->shadow_image ||
+			assert(w->shadow_image.p != NULL ||
 			       win_check_flags_all(w, WIN_FLAGS_SHADOW_STALE) ||
 			       ps->o.legacy_backends);
 			add_damage(ps, &extents);
@@ -2127,8 +2127,8 @@ static void unmap_win_finish(session_t *ps, struct managed_win *w) {
 			win_release_pixmap(ps->backend_data, w);
 		}
 	} else {
-		assert(!w->win_image);
-		assert(!w->shadow_image);
+		assert(w->win_image.p == NULL);
+		assert(w->shadow_image.p == NULL);
 	}
 
 	free_paint(ps, &w->paint);
@@ -2161,7 +2161,7 @@ static void destroy_win_finish(session_t *ps, struct win *w) {
 
 		// Unmapping preserves the shadow image, so free it here
 		if (!win_check_flags_all(mw, WIN_FLAGS_SHADOW_NONE)) {
-			assert(mw->shadow_image != NULL);
+			assert(mw->shadow_image.p != NULL);
 			win_release_shadow(ps->backend_data, mw);
 		}
 		win_release_mask(ps->backend_data, mw);

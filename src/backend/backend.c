@@ -208,10 +208,10 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 		ps->backend_data->ops->prepare(ps->backend_data, &reg_paint);
 	}
 
-	if (ps->root_image) {
+	if (ps->root_image.p != NULL) {
 		ps->backend_data->ops->compose(ps->backend_data, ps->root_image,
-		                               (coord_t){0}, NULL, (coord_t){0},
-		                               &reg_paint, &reg_visible);
+		                               (coord_t){0}, IMAGE_HANDLE_NONE,
+		                               (coord_t){0}, &reg_paint, &reg_visible);
 	} else {
 		ps->backend_data->ops->fill(ps->backend_data, (struct color){0, 0, 0, 1},
 		                            &reg_paint);
@@ -234,7 +234,7 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 		auto reg_bound_no_corner =
 		    win_get_bounding_shape_global_without_corners_by_val(w);
 
-		if (!w->mask_image && (w->bounding_shaped || w->corner_radius != 0)) {
+		if (w->mask_image.p == NULL && (w->bounding_shaped || w->corner_radius != 0)) {
 			win_bind_mask(ps->backend_data, w);
 		}
 
@@ -370,18 +370,18 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 				                          &reg_visible);
 			}
 
-			assert(w->shadow_image);
+			assert(w->shadow_image.p != NULL);
 			ps->backend_data->ops->set_image_property(
 			    ps->backend_data, IMAGE_PROPERTY_OPACITY, w->shadow_image,
 			    &w->opacity);
 			coord_t shadow_coord = {.x = w->g.x + w->shadow_dx,
 			                        .y = w->g.y + w->shadow_dy};
 
-			auto inverted_mask = NULL;
+			image_handle inverted_mask = IMAGE_HANDLE_NONE;
 			if (!ps->o.wintype_option[w->window_type].full_shadow) {
 				pixman_region32_subtract(&reg_shadow, &reg_shadow,
 				                         &reg_bound_no_corner);
-				if (w->mask_image) {
+				if (w->mask_image.p != NULL) {
 					inverted_mask = w->mask_image;
 					ps->backend_data->ops->set_image_property(
 					    ps->backend_data, IMAGE_PROPERTY_INVERTED,
@@ -391,7 +391,7 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 			ps->backend_data->ops->compose(
 			    ps->backend_data, w->shadow_image, shadow_coord,
 			    inverted_mask, window_coord, &reg_shadow, &reg_visible);
-			if (inverted_mask) {
+			if (inverted_mask.p != NULL) {
 				ps->backend_data->ops->set_image_property(
 				    ps->backend_data, IMAGE_PROPERTY_INVERTED,
 				    inverted_mask, (bool[]){false});
@@ -457,9 +457,9 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 
 		// Draw window on target
 		if (w->frame_opacity == 1) {
-			ps->backend_data->ops->compose(ps->backend_data, w->win_image,
-			                               window_coord, NULL, window_coord,
-			                               &reg_paint_in_bound, &reg_visible);
+			ps->backend_data->ops->compose(
+			    ps->backend_data, w->win_image, window_coord, IMAGE_HANDLE_NONE,
+			    window_coord, &reg_paint_in_bound, &reg_visible);
 		} else {
 			// For window image processing, we don't have to limit the process
 			// region to damage for correctness. (see <damager-note> for
@@ -497,9 +497,9 @@ bool paint_all_new(session_t *ps, struct managed_win *const t) {
 			    ps->backend_data, IMAGE_OP_APPLY_ALPHA, new_img, &reg_frame,
 			    &reg_visible_local, (double[]){w->frame_opacity});
 			pixman_region32_fini(&reg_frame);
-			ps->backend_data->ops->compose(ps->backend_data, new_img,
-			                               window_coord, NULL, window_coord,
-			                               &reg_paint_in_bound, &reg_visible);
+			ps->backend_data->ops->compose(
+			    ps->backend_data, new_img, window_coord, IMAGE_HANDLE_NONE,
+			    window_coord, &reg_paint_in_bound, &reg_visible);
 			ps->backend_data->ops->release_image(ps->backend_data, new_img);
 			pixman_region32_fini(&reg_visible_local);
 			pixman_region32_fini(&reg_bound_local);

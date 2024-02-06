@@ -275,7 +275,7 @@ end:
 	return &gd->gl.base;
 }
 
-static void *
+static image_handle
 egl_bind_pixmap(backend_t *base, xcb_pixmap_t pixmap, struct xvisual_info fmt, bool owned) {
 	struct egl_data *gd = (void *)base;
 	struct egl_pixmap *eglpixmap = NULL;
@@ -284,7 +284,7 @@ egl_bind_pixmap(backend_t *base, xcb_pixmap_t pixmap, struct xvisual_info fmt, b
 	    xcb_get_geometry_reply(base->c->c, xcb_get_geometry(base->c->c, pixmap), NULL);
 	if (!r) {
 		log_error("Invalid pixmap %#010x", pixmap);
-		return NULL;
+		return IMAGE_HANDLE_NONE;
 	}
 
 	log_trace("Binding pixmap %#010x", pixmap);
@@ -328,7 +328,7 @@ egl_bind_pixmap(backend_t *base, xcb_pixmap_t pixmap, struct xvisual_info fmt, b
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	gl_check_err();
-	return wd;
+	return (image_handle){.p = wd};
 err:
 	if (eglpixmap && eglpixmap->image) {
 		eglDestroyImageProc(gd->display, eglpixmap->image);
@@ -339,7 +339,7 @@ err:
 		xcb_free_pixmap(base->c->c, pixmap);
 	}
 	free(wd);
-	return NULL;
+	return IMAGE_HANDLE_NONE;
 }
 
 static void egl_present(backend_t *base, const region_t *region attr_unused) {

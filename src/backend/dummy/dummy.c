@@ -64,13 +64,13 @@ static void dummy_check_image(struct backend_base *base, const struct dummy_imag
 	assert(*tmp->refcount > 0);
 }
 
-void dummy_compose(struct backend_base *base, void *image, coord_t dst attr_unused,
-                   void *mask attr_unused, coord_t mask_dst attr_unused,
+void dummy_compose(struct backend_base *base, image_handle image, coord_t dst attr_unused,
+                   image_handle mask attr_unused, coord_t mask_dst attr_unused,
                    const region_t *reg_paint attr_unused,
                    const region_t *reg_visible attr_unused) {
 	auto dummy attr_unused = (struct dummy_data *)base;
-	dummy_check_image(base, image);
-	assert(mask == NULL || mask == &dummy->mask);
+	dummy_check_image(base, image.p);
+	assert(mask.p == NULL || mask.p == &dummy->mask);
 }
 
 void dummy_fill(struct backend_base *backend_data attr_unused, struct color c attr_unused,
@@ -78,20 +78,20 @@ void dummy_fill(struct backend_base *backend_data attr_unused, struct color c at
 }
 
 bool dummy_blur(struct backend_base *backend_data attr_unused, double opacity attr_unused,
-                void *blur_ctx attr_unused, void *mask attr_unused,
+                void *blur_ctx attr_unused, image_handle mask attr_unused,
                 coord_t mask_dst attr_unused, const region_t *reg_blur attr_unused,
                 const region_t *reg_visible attr_unused) {
 	return true;
 }
 
-void *dummy_bind_pixmap(struct backend_base *base, xcb_pixmap_t pixmap,
-                        struct xvisual_info fmt, bool owned) {
+image_handle dummy_bind_pixmap(struct backend_base *base, xcb_pixmap_t pixmap,
+                               struct xvisual_info fmt, bool owned) {
 	auto dummy = (struct dummy_data *)base;
 	struct dummy_image *img = NULL;
 	HASH_FIND_INT(dummy->images, &pixmap, img);
 	if (img) {
 		(*img->refcount)++;
-		return img;
+		return (image_handle){.p = img};
 	}
 
 	img = ccalloc(1, struct dummy_image);
@@ -102,15 +102,15 @@ void *dummy_bind_pixmap(struct backend_base *base, xcb_pixmap_t pixmap,
 	img->owned = owned;
 
 	HASH_ADD_INT(dummy->images, pixmap, img);
-	return (void *)img;
+	return (image_handle){.p = img};
 }
 
-void dummy_release_image(backend_t *base, void *image) {
+void dummy_release_image(backend_t *base, image_handle image) {
 	auto dummy = (struct dummy_data *)base;
-	if (image == &dummy->mask) {
+	if (image.p == &dummy->mask) {
 		return;
 	}
-	auto img = (struct dummy_image *)image;
+	auto img = (struct dummy_image *)image.p;
 	assert(*img->refcount > 0);
 	(*img->refcount)--;
 	if (*img->refcount == 0) {
@@ -123,8 +123,8 @@ void dummy_release_image(backend_t *base, void *image) {
 	}
 }
 
-bool dummy_is_image_transparent(struct backend_base *base, void *image) {
-	auto img = (struct dummy_image *)image;
+bool dummy_is_image_transparent(struct backend_base *base, image_handle image) {
+	auto img = (struct dummy_image *)image.p;
 	dummy_check_image(base, img);
 	return img->transparent;
 }
@@ -134,29 +134,29 @@ int dummy_buffer_age(struct backend_base *base attr_unused) {
 }
 
 bool dummy_image_op(struct backend_base *base, enum image_operations op attr_unused,
-                    void *image, const region_t *reg_op attr_unused,
+                    image_handle image, const region_t *reg_op attr_unused,
                     const region_t *reg_visible attr_unused, void *args attr_unused) {
-	dummy_check_image(base, image);
+	dummy_check_image(base, image.p);
 	return true;
 }
 
-void *dummy_make_mask(struct backend_base *base, geometry_t size attr_unused,
-                      const region_t *reg attr_unused) {
-	return &(((struct dummy_data *)base)->mask);
+image_handle dummy_make_mask(struct backend_base *base, geometry_t size attr_unused,
+                             const region_t *reg attr_unused) {
+	return (image_handle){.p = &(((struct dummy_data *)base)->mask)};
 }
 
 bool dummy_set_image_property(struct backend_base *base, enum image_properties prop attr_unused,
-                              void *image, void *arg attr_unused) {
-	dummy_check_image(base, image);
+                              image_handle image, void *arg attr_unused) {
+	dummy_check_image(base, image.p);
 	return true;
 }
 
-void *dummy_clone_image(struct backend_base *base, const void *image,
-                        const region_t *reg_visible attr_unused) {
-	auto img = (const struct dummy_image *)image;
+image_handle dummy_clone_image(struct backend_base *base, image_handle image,
+                               const region_t *reg_visible attr_unused) {
+	auto img = (struct dummy_image *)image.p;
 	dummy_check_image(base, img);
 	(*img->refcount)++;
-	return (void *)img;
+	return (image_handle){.p = img};
 }
 
 void *dummy_create_blur_context(struct backend_base *base attr_unused,

@@ -364,26 +364,26 @@ end:
 	return &gd->gl.base;
 }
 
-static void *
+static image_handle
 glx_bind_pixmap(backend_t *base, xcb_pixmap_t pixmap, struct xvisual_info fmt, bool owned) {
 	struct _glx_pixmap *glxpixmap = NULL;
 	// Retrieve pixmap parameters, if they aren't provided
 	if (fmt.visual_depth > OPENGL_MAX_DEPTH) {
 		log_error("Requested depth %d higher than max possible depth %d.",
 		          fmt.visual_depth, OPENGL_MAX_DEPTH);
-		return NULL;
+		return IMAGE_HANDLE_NONE;
 	}
 
 	if (fmt.visual_depth < 0) {
 		log_error("Pixmap %#010x with invalid depth %d", pixmap, fmt.visual_depth);
-		return NULL;
+		return IMAGE_HANDLE_NONE;
 	}
 
 	auto r =
 	    xcb_get_geometry_reply(base->c->c, xcb_get_geometry(base->c->c, pixmap), NULL);
 	if (!r) {
 		log_error("Invalid pixmap %#010x", pixmap);
-		return NULL;
+		return IMAGE_HANDLE_NONE;
 	}
 
 	log_trace("Binding pixmap %#010x", pixmap);
@@ -444,7 +444,7 @@ glx_bind_pixmap(backend_t *base, xcb_pixmap_t pixmap, struct xvisual_info fmt, b
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	gl_check_err();
-	return wd;
+	return (image_handle){.p = wd};
 err:
 	if (glxpixmap && glxpixmap->glpixmap) {
 		glXDestroyPixmap(base->c->dpy, glxpixmap->glpixmap);
@@ -455,7 +455,7 @@ err:
 		xcb_free_pixmap(base->c->c, pixmap);
 	}
 	free(wd);
-	return NULL;
+	return IMAGE_HANDLE_NONE;
 }
 
 static void glx_present(backend_t *base, const region_t *region attr_unused) {
