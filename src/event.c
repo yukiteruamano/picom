@@ -586,15 +586,21 @@ static inline void repair_win(session_t *ps, struct managed_win *w) {
 	pixman_region32_init(&parts);
 
 	if (!w->ever_damaged) {
-		win_extents(w, &parts);
-		if (!ps->o.show_all_xerrors) {
-			set_ignore_cookie(&ps->c, xcb_damage_subtract(ps->c.c, w->damage,
-			                                              XCB_NONE, XCB_NONE));
+		auto e = xcb_request_check(
+		    ps->c.c, xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE, XCB_NONE));
+		if (e) {
+			if (ps->o.show_all_xerrors) {
+				x_print_error(e->sequence, e->major_code, e->minor_code,
+				              e->error_code);
+			}
+			free(e);
 		}
+		win_extents(w, &parts);
 	} else {
+		auto cookie =
+		    xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE, ps->damaged_region);
 		if (!ps->o.show_all_xerrors) {
-			set_ignore_cookie(&ps->c, xcb_damage_subtract(ps->c.c, w->damage, XCB_NONE,
-			                                              ps->damaged_region));
+			set_ignore_cookie(&ps->c, cookie);
 		}
 		x_fetch_region(&ps->c, ps->damaged_region, &parts);
 		pixman_region32_translate(&parts, w->g.x + w->g.border_width,
